@@ -1,0 +1,350 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>US National Debt Tracker</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/dist/tabler-icons.min.css" />
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: #111;
+      color: #fff;
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 1.5rem;
+    }
+
+    .widget {
+      width: 100%;
+      max-width: 700px;
+    }
+
+    .header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 1.25rem;
+    }
+
+    .header-left {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .header-left i {
+      font-size: 20px;
+      color: rgba(255,255,255,0.5);
+    }
+
+    .header-left span {
+      font-size: 15px;
+      font-weight: 500;
+      color: #fff;
+    }
+
+    .refresh-btn {
+      font-size: 12px;
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      padding: 5px 12px;
+      background: rgba(255,255,255,0.08);
+      border: 0.5px solid rgba(255,255,255,0.2);
+      border-radius: 6px;
+      color: rgba(255,255,255,0.7);
+      cursor: pointer;
+      transition: background 0.15s;
+    }
+
+    .refresh-btn:hover { background: rgba(255,255,255,0.14); }
+    .refresh-btn:disabled { opacity: 0.4; cursor: default; }
+
+    .cards {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+      gap: 10px;
+      margin-bottom: 1.25rem;
+    }
+
+    .card {
+      background: rgba(255,255,255,0.07);
+      border-radius: 8px;
+      padding: 1rem;
+    }
+
+    .card-label {
+      font-size: 12px;
+      color: rgba(255,255,255,0.45);
+      margin-bottom: 6px;
+    }
+
+    .card-value {
+      font-size: 20px;
+      font-weight: 500;
+      color: #fff;
+    }
+
+    .card-value.danger { color: #f09595; }
+
+    .ticker-row {
+      background: rgba(255,255,255,0.07);
+      border-radius: 8px;
+      padding: 0.75rem 1rem;
+      margin-bottom: 1.5rem;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+
+    .ticker-row i {
+      font-size: 16px;
+      color: rgba(255,255,255,0.45);
+    }
+
+    .ticker-label {
+      font-size: 12px;
+      color: rgba(255,255,255,0.45);
+    }
+
+    #liveTicker {
+      font-size: 15px;
+      font-weight: 500;
+      color: #fff;
+      font-variant-numeric: tabular-nums;
+    }
+
+    #lastUpdated {
+      font-size: 11px;
+      color: rgba(255,255,255,0.3);
+      margin-left: auto;
+    }
+
+    .chart-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 6px;
+    }
+
+    .chart-title {
+      font-size: 13px;
+      color: rgba(255,255,255,0.45);
+    }
+
+    .chart-source {
+      font-size: 11px;
+      color: rgba(255,255,255,0.25);
+    }
+
+    .chart-wrap {
+      position: relative;
+      width: 100%;
+      height: 220px;
+    }
+
+    #statusMsg {
+      font-size: 11px;
+      color: rgba(255,255,255,0.3);
+      text-align: center;
+      margin-top: 1rem;
+      min-height: 1.2em;
+    }
+
+    .sr-only {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      padding: 0;
+      margin: -1px;
+      overflow: hidden;
+      clip: rect(0,0,0,0);
+      white-space: nowrap;
+      border: 0;
+    }
+  </style>
+</head>
+<body>
+  <div class="widget">
+    <h1 class="sr-only">US National Debt Tracker</h1>
+
+    <div class="header">
+      <div class="header-left">
+        <i class="ti ti-building-bank" aria-hidden="true"></i>
+        <span>US national debt</span>
+      </div>
+      <button class="refresh-btn" id="refreshBtn" onclick="loadDebt()">
+        <i class="ti ti-refresh" aria-hidden="true"></i> Refresh
+      </button>
+    </div>
+
+    <div class="cards">
+      <div class="card">
+        <p class="card-label">Total debt</p>
+        <p class="card-value" id="totalDebt">—</p>
+      </div>
+      <div class="card">
+        <p class="card-label">Per capita</p>
+        <p class="card-value" id="perCapita">—</p>
+      </div>
+      <div class="card">
+        <p class="card-label">Debt / GDP</p>
+        <p class="card-value" id="debtGDP">—</p>
+      </div>
+      <div class="card">
+        <p class="card-label">Increase today</p>
+        <p class="card-value danger" id="todayIncrease">—</p>
+      </div>
+    </div>
+
+    <div class="ticker-row">
+      <i class="ti ti-clock" aria-hidden="true"></i>
+      <span class="ticker-label">Live estimate:</span>
+      <span id="liveTicker" aria-live="polite" aria-label="Live debt estimate">$—</span>
+      <span id="lastUpdated"></span>
+    </div>
+
+    <div class="chart-header">
+      <span class="chart-title">Debt over time (trillion $)</span>
+      <span class="chart-source">Source: US Treasury / Fiscal Data</span>
+    </div>
+    <div class="chart-wrap">
+      <canvas id="debtChart" role="img" aria-label="Line chart showing US national debt growth from 2000 to 2025">
+        US national debt has grown from about $5.6 trillion in 2000 to over $36 trillion in 2025.
+      </canvas>
+    </div>
+
+    <p id="statusMsg"></p>
+  </div>
+
+  <script>
+    const historicalData = {
+      labels: ['2000','2001','2002','2003','2004','2005','2006','2007','2008','2009','2010','2011','2012','2013','2014','2015','2016','2017','2018','2019','2020','2021','2022','2023','2024','2025'],
+      data:   [5.67,  5.81,  6.23,  6.78,  7.38,  7.93,  8.51,  9.01, 10.02, 11.91, 13.56, 14.79, 16.07, 16.74, 17.82, 18.15, 19.57, 20.24, 21.52, 22.72, 27.75, 29.62, 30.93, 33.17, 34.59, 36.22]
+    };
+
+    const POP = 335000000;
+    const GDP = 29000000000000;
+    const DAILY_INCREASE = 5200000000;
+    const DEBT_BASE = 36220000000000;
+    const BASE_DATE = new Date('2025-01-01T00:00:00Z');
+
+    let chart = null;
+    let tickerInterval = null;
+
+    function fmt(n) {
+      if (n >= 1e12) return '$' + (n / 1e12).toFixed(2) + 'T';
+      if (n >= 1e9)  return '$' + (n / 1e9).toFixed(1) + 'B';
+      return '$' + n.toLocaleString();
+    }
+
+    function fmtFull(n) {
+      return '$' + Math.round(n).toLocaleString();
+    }
+
+    function estimateCurrentDebt() {
+      const msElapsed = Date.now() - BASE_DATE.getTime();
+      return DEBT_BASE + (msElapsed / 86400000) * DAILY_INCREASE;
+    }
+
+    function startTicker(baseDebt) {
+      if (tickerInterval) clearInterval(tickerInterval);
+      const ratePerMs = DAILY_INCREASE / 86400000;
+      const refTime = Date.now();
+      tickerInterval = setInterval(() => {
+        const current = baseDebt + (Date.now() - refTime) * ratePerMs;
+        document.getElementById('liveTicker').textContent = fmtFull(current);
+      }, 100);
+    }
+
+    function updateCards(debt) {
+      document.getElementById('totalDebt').textContent = fmt(debt);
+      document.getElementById('perCapita').textContent = '$' + Math.round(debt / POP).toLocaleString();
+      document.getElementById('debtGDP').textContent = (debt / GDP * 100).toFixed(1) + '%';
+      document.getElementById('todayIncrease').textContent = '+' + fmt(DAILY_INCREASE) + '/day';
+    }
+
+    function buildChart() {
+      if (chart) chart.destroy();
+      chart = new Chart(document.getElementById('debtChart'), {
+        type: 'line',
+        data: {
+          labels: historicalData.labels,
+          datasets: [{
+            label: 'National debt (T$)',
+            data: historicalData.data,
+            borderColor: '#85B7EB',
+            backgroundColor: 'rgba(133,183,235,0.15)',
+            fill: true,
+            tension: 0.4,
+            pointRadius: 2,
+            pointHoverRadius: 5,
+            borderWidth: 2,
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: {
+            legend: { display: false },
+            tooltip: {
+              callbacks: {
+                label: ctx => ' $' + ctx.parsed.y.toFixed(2) + 'T'
+              }
+            }
+          },
+          scales: {
+            x: {
+              ticks: { color: 'rgba(255,255,255,0.4)', font: { size: 11 }, maxTicksLimit: 9 },
+              grid: { color: 'rgba(255,255,255,0.07)' }
+            },
+            y: {
+              ticks: {
+                color: 'rgba(255,255,255,0.4)',
+                font: { size: 11 },
+                callback: v => '$' + v + 'T'
+              },
+              grid: { color: 'rgba(255,255,255,0.07)' }
+            }
+          }
+        }
+      });
+    }
+
+    async function loadDebt() {
+      document.getElementById('statusMsg').textContent = 'Fetching latest data…';
+      document.getElementById('refreshBtn').disabled = true;
+
+      try {
+        const url = 'https://api.fiscaldata.treasury.gov/services/api/v1/debt/od/debt_to_penny?fields=record_date,tot_pub_debt_out_amt&sort=-record_date&limit=1';
+        const res = await fetch(url);
+        const json = await res.json();
+        const record = json.data[0];
+        const debt = parseFloat(record.tot_pub_debt_out_amt);
+        document.getElementById('lastUpdated').textContent = 'As of ' + record.record_date;
+        document.getElementById('statusMsg').textContent = '';
+        updateCards(debt);
+        startTicker(debt);
+      } catch (e) {
+        const est = estimateCurrentDebt();
+        document.getElementById('lastUpdated').textContent = 'Estimated';
+        document.getElementById('statusMsg').textContent = 'Live API unavailable — showing model estimate';
+        updateCards(est);
+        startTicker(est);
+      }
+
+      document.getElementById('refreshBtn').disabled = false;
+      buildChart();
+    }
+
+    loadDebt();
+  </script>
+</body>
+</html>
